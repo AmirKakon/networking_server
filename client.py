@@ -14,7 +14,8 @@ server_data = {
     "token": None,
     "descriptors": {},
     "user": None,
-    "authCode": None
+    "authCode": None,
+    "exitCode": None,
 }
 
 def connect_tcp_server():
@@ -22,10 +23,12 @@ def connect_tcp_server():
     sock.connect((SERVER_HOST, MESSAGE_SERVER_PORT))
     return sock
 
-def send_tcp_message(sock, message, size=4096):
+def send_tcp_message(sock, message, size=4096, expect_response = True):
     sock.sendall(message)
-    response = sock.recv(size)
-    return response
+    if(expect_response):
+        response = sock.recv(size)
+        return response
+    return None
 
 def send_udp_message(host, port, message):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -189,17 +192,14 @@ def handle_notification(data, tcp_sock):
 
     print(f"\n[Notification] Type: {notification_type}, Payload: {notification_payload}\n")
 
-    # Check if the notification is an exit call
-    if notification_type == 1:  # Assuming 1 is the exit call notification type
-        print("Received exit notification. Sending exit request to server...")
-        send_exit_request(notification_payload, tcp_sock)
+    server_data["exitCode"] = notification_payload
 
-def send_exit_request(exit_code, tcp_sock):
+def send_exit_request(tcp_sock):
     # Create and send the exit message
-    exit_message = create_exit_message(server_data['token'], exit_code)
+    exit_message = create_exit_message(server_data['token'], server_data["exitCode"])
     # Assuming the exit request is sent over the TCP connection
-    send_tcp_message(tcp_sock, exit_message)
-    tcp_sock.close()
+    send_tcp_message(tcp_sock, exit_message, expect_response=False)
+    # tcp_sock.close()
     print("Exit request sent to server.")
 
 
@@ -253,8 +253,10 @@ def main():
     parse_broadcast_response(broadcast_response)
     print("\nBroadcast Message Completed! \n")
 
+    print("\nSending exit request to server...\n")
+    send_exit_request(tcp_sock)
+
     # Step 9: Close the TCP connection
-    tcp_sock.close()
     print("\nProgram ended.\n")
 
 if __name__ == "__main__":
